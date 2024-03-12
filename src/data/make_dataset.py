@@ -3,7 +3,6 @@ import logging
 from pathlib import Path
 
 import click
-import polars as pl
 from dotenv import find_dotenv, load_dotenv
 
 
@@ -17,10 +16,8 @@ def main(input_filepath, output_filepath):
     logger = logging.getLogger(__name__)
     logger.info('making final data set from raw data')
 
-    df = pl.read_parquet('../data/raw/cards.parquet')
-
-    # Display the dataframe
-    print(df)
+    # Download the file
+    url = 'https://mtgjson.com/api/v5/parquet/cards.parquet.zip'
 
 
 if __name__ == '__main__':
