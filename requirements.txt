@@ -11,3 +11,5 @@ polars == 0.20.15
 ipykernel == 6.29.3
 langchain == 0.1.12
 langchain_community == 0.0.28
+lancedb == 0.6.3
+langchain-openai == 0.0.8
