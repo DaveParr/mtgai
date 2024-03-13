@@ -2,9 +2,12 @@
 -e .
 
 # external requirements
-click
-Sphinx
-coverage
-flake8
+click == 8.1.7
+Sphinx == 7.2.6
+coverage == 7.4.3
+flake8 == 7.0.0
 python-dotenv>=0.5.1
 polars == 0.20.15
+ipykernel == 6.29.3
+langchain == 0.1.12
+langchain_community == 0.0.28
