@@ -3,7 +3,10 @@ from typing import Union
 
 import polars as pl
 import structlog
+from langchain.vectorstores import Chroma
 from langchain_community.document_loaders import PolarsDataFrameLoader
+from langchain_community.vectorstores.utils import filter_complex_metadata
+from langchain_openai import OpenAIEmbeddings
 
 # Get a logger.
 log = structlog.get_logger()
@@ -113,6 +116,20 @@ def create_page_content(
     return with_page_contents
 
 
+def create_commander_selections(
+    x: Union[pl.DataFrame, pl.LazyFrame],
+) -> Union[pl.DataFrame, pl.LazyFrame]:
+    commander_selections = x.filter(
+        (pl.col("types") == "Creature") & (pl.col("supertypes") == "Legendary")
+    )
+    log.debug(
+        "Commander data",
+        data=commander_selections.describe(),
+        columns=commander_selections.columns,
+    )
+    return commander_selections
+
+
 if __name__ == "__main__":
     # set log to info
     logging.basicConfig(level=logging.INFO)
@@ -132,8 +149,28 @@ if __name__ == "__main__":
         columns=processed_data.columns,
     )
 
+    commanders = create_commander_selections(processed_data)
+
+    commanders.write_parquet("src/application/commanders.parquet")
+
+    log.info("Wrote commanders", data=commanders.describe())
+
     loader = PolarsDataFrameLoader(processed_data, page_content_column="page_content")
 
     documents = loader.load()
 
-    log.info("Loaded documents", first=documents[0])
+    log.info("Loaded documents", first=documents[0], n=len(documents))
+
+    filtered_documents = filter_complex_metadata(documents)
+
+    log.info(
+        "Filtered documents", first=filtered_documents[0], n=len(filtered_documents)
+    )
+
+    embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
+
+    vectorstore = Chroma.from_documents(
+        filtered_documents, embeddings, persist_directory="src/application/chroma"
+    )
+
+    log.info("Created vectorstore", vectorstore=vectorstore)
