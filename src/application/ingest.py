@@ -3,6 +3,7 @@ from typing import Union
 
 import polars as pl
 import structlog
+from langchain_community.document_loaders import PolarsDataFrameLoader
 
 # Get a logger.
 log = structlog.get_logger()
@@ -10,7 +11,7 @@ log = structlog.get_logger()
 
 def read_data(path: str) -> pl.DataFrame:
     data = pl.read_parquet(path)
-    log.info("Read data", data=data.describe())
+    log.debug("Read data", data=data.describe())
     return data
 
 
@@ -62,12 +63,15 @@ def filter_main_sets(
     }
     x_filtered = x.filter(pl.col("setCode").is_in(list(recent_main_sets.keys())))
 
+    log.debug("Filtered data", data=x_filtered.describe())
     return x_filtered
 
 
-def collapse_sets(df) -> pl.DataFrame:
-    return (
-        df.group_by(
+def collapse_sets(
+    x: Union[pl.DataFrame, pl.LazyFrame],
+) -> Union[pl.DataFrame, pl.LazyFrame]:
+    x_collapsed = (
+        x.group_by(
             "name",
             "colorIdentity",
             "colors",
@@ -87,13 +91,49 @@ def collapse_sets(df) -> pl.DataFrame:
         .agg(pl.col("setCode").map_elements(list).alias("setCodes"))
         .sort("name")
     )
+    log.debug(
+        "Collapsed data", data=x_collapsed.describe(), columns=x_collapsed.columns
+    )
+    return x_collapsed
+
+
+def create_page_content(
+    x: Union[pl.DataFrame, pl.LazyFrame],
+) -> Union[pl.DataFrame, pl.LazyFrame]:
+    with_page_contents = x.with_columns(
+        page_content=pl.col("type")
+        + pl.col("text").fill_null("")
+        + pl.col("keywords").fill_null(""),
+    )
+    log.debug(
+        "Created page content",
+        data=with_page_contents.describe(),
+        columns=with_page_contents.columns,
+    )
+    return with_page_contents
 
 
 if __name__ == "__main__":
     # set log to info
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
     data = read_data("data/raw/cards.parquet")
 
-    processed_data = data.lazy().pipe(filter_main_sets).pipe(collapse_sets).collect()
+    processed_data = (
+        data.lazy()
+        .pipe(filter_main_sets)
+        .pipe(collapse_sets)
+        .pipe(create_page_content)
+        .collect()
+    )
 
-    print(processed_data)
+    log.info(
+        "Processed data",
+        data=processed_data.describe(),
+        columns=processed_data.columns,
+    )
+
+    loader = PolarsDataFrameLoader(processed_data, page_content_column="page_content")
+
+    documents = loader.load()
+
+    log.info("Loaded documents", first=documents[0])
