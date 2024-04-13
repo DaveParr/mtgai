@@ -13,4 +13,6 @@ langchain == 0.1.12
 langchain_community == 0.0.28
 lancedb == 0.6.3
 langchain-openai == 0.0.8
-chroma == 0.4.24
+chroma == 0.2.0
+gradio == 4.26.0
+structlog == 24.1.0
