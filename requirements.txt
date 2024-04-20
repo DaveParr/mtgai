@@ -16,5 +16,6 @@ langchain-openai == 0.0.8
 chroma == 0.2.0
 langchain-chroma == 0.1.0
 gradio == 4.26.0
+streamlit == 1.33.0
 structlog == 24.1.0
 icecream == 2.1.3

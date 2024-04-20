@@ -6,9 +6,7 @@ import polars as pl
 import structlog
 from langchain.chains import HypotheticalDocumentEmbedder
 from langchain.globals import set_debug
-from langchain.prompts import (
-    PromptTemplate,
-)
+from langchain.prompts import PromptTemplate
 from langchain_chroma import Chroma
 from langchain_openai import OpenAI, OpenAIEmbeddings
 
@@ -22,10 +20,10 @@ except ImportError:  # Graceful fallback if IceCream isn't installed.
 embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
 
 vectorstore = Chroma(
-    persist_directory="src/application/chroma",
+    persist_directory="src/gradio/chroma",
 )
 
-commanders = pl.read_parquet("src/application/commanders.parquet")
+commanders = pl.read_parquet("src/gradio/commanders.parquet")
 
 commander_names = commanders["name"].to_list()
 

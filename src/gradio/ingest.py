@@ -119,8 +119,11 @@ def create_page_content(
 def create_commander_selections(
     x: Union[pl.DataFrame, pl.LazyFrame],
 ) -> Union[pl.DataFrame, pl.LazyFrame]:
+    # name does not start with "A-"
     commander_selections = x.filter(
-        (pl.col("types") == "Creature") & (pl.col("supertypes") == "Legendary")
+        (pl.col("types") == "Creature")
+        & (pl.col("supertypes") == "Legendary")
+        & ~pl.col("name").str.starts_with("A-")  # untested
     )
     log.debug(
         "Commander data",
