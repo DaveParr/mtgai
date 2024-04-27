@@ -37,7 +37,16 @@ def get_commander_data(commander) -> pd.DataFrame:
     return (
         commanders.filter(pl.col("name") == commander)
         .select(
-            ["name", "manaCost", "supertypes", "subtypes", "text", "power", "toughness"]
+            [
+                "name",
+                "colorIdentity",
+                "manaCost",
+                "types",
+                "subtypes",
+                "text",
+                "power",
+                "toughness",
+            ]
         )
         .to_pandas()
     )
@@ -88,7 +97,16 @@ def generate_card_suggestions(commander) -> pd.DataFrame:
     display_suggestions = (
         pl.DataFrame(suggestions)
         .select(
-            ["name", "manaCost", "supertypes", "subtypes", "text", "power", "toughness"]
+            [
+                "name",
+                "colorIdentity",
+                "manaCost",
+                "types",
+                "subtypes",
+                "text",
+                "power",
+                "toughness",
+            ]
         )
         .filter(~pl.col("name").str.contains(commander))
     )
