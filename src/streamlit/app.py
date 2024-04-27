@@ -94,8 +94,19 @@ def generate_card_suggestions(commander) -> pd.DataFrame:
         if commander in item["name"]:
             log.info("Commander card in metadata", metadata=item)
 
+    commander_identity = commander_data["colorIdentity"].to_list()[0]
+
+    def in_commander_colours(colors, color_list=commander_identity):
+        return set(colors).issubset(set(color_list))
+
     display_suggestions = (
         pl.DataFrame(suggestions)
+        .with_columns(
+            pl.col("colorIdentity")
+            .str.split(by=", ")
+            .apply(in_commander_colours, return_dtype=pl.Boolean)
+            .alias("in_commander_colours"),
+        )
         .select(
             [
                 "name",
@@ -104,11 +115,15 @@ def generate_card_suggestions(commander) -> pd.DataFrame:
                 "types",
                 "subtypes",
                 "text",
-                "power",
-                "toughness",
+                # FIXME:will fail if no returns have power or toughness
+                # "power",
+                # "toughness",
+                "in_commander_colours",
             ]
         )
-        .filter(~pl.col("name").str.contains(commander))
+        .filter(
+            ~pl.col("name").str.contains(commander),
+        )
     )
 
     return display_suggestions.to_pandas()
