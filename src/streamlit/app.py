@@ -19,23 +19,23 @@ try:
 except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
-embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
+EMBEDDINGS = OpenAIEmbeddings(model="text-embedding-3-large")
 
-vectorstore = Chroma(
+VECTORSTORE = Chroma(
     persist_directory="src/gradio/chroma",
 )
-commanders = pl.read_parquet("src/streamlit/commanders.parquet")
+COMMANDERS = pl.read_parquet("src/streamlit/commanders.parquet")
 
-commander_names = commanders["name"].to_list()
+COMMANDER_NAMES = COMMANDERS["name"].to_list()
 
-log = structlog.get_logger()
+LOG = structlog.get_logger()
 
-llm = OpenAI()
+LLM = OpenAI()
 
 
-def get_commander_data(commander) -> pd.DataFrame:
+def get_commander_data(commander: str) -> pd.DataFrame:
     return (
-        commanders.filter(pl.col("name") == commander)
+        COMMANDERS.filter(pl.col("name") == commander)
         .select(
             [
                 "name",
@@ -65,7 +65,7 @@ def generate_deck_theme_suggestions(commander_data: pd.DataFrame) -> str:
         """
     )
 
-    theme_chain = deck_theme_prompt | llm
+    theme_chain = deck_theme_prompt | LLM
 
     commander_description = commander_data.to_dict(orient="records")
 
@@ -98,19 +98,14 @@ creature_prompt = PromptTemplate.from_template(
     """
 )
 
-sorcery_prompt = PromptTemplate.from_template(
+mtg_prompt_template = PromptTemplate.from_template(
     """"
-    Design a single Magic the Gathering sorcery type card that would be valuable to include in a commander deck with {commander} as the commander. 
+    Design a single Magic the Gathering {type} type card that would be valuable to include in a commander deck with {commander} as the commander.
+    The theme of the deck is {theme}. 
     Do not suggest the commander card itself.
     Your suggestions should be based on the commander's abilities and the general strategy of the deck.
 
-    Your response should be a card formated in json, each with the following information:
-    - Name
-    - Mana cost
-    - Supertypes
-    - Types
-    - Subtypes
-    - Text
+    Your response should be a card formated in json, each with the following keys: {card_keys}
 
     Do not suggest to include the commander itself.
 
@@ -121,26 +116,58 @@ sorcery_prompt = PromptTemplate.from_template(
 )
 
 
-def generate_card_suggestions(commander, prompt: PromptTemplate) -> pd.DataFrame:
-    # return the commander tha matches the name
-    commander_data = commanders.filter(pl.col("name") == commander).drop("page_content")
+sorcery_partial_prompt = mtg_prompt_template.partial(
+    type="sorcery", card_keys="Name, Mana cost, Types, Subtypes, Text"
+)
+
+creature_partial_prompt = mtg_prompt_template.partial(
+    type="creature",
+    card_keys="Name, Mana cost, Types, Subtypes, Text, Power, Toughness",
+)
+
+artifact_partial_prompt = mtg_prompt_template.partial(
+    type="artifact", card_keys="Name, Mana cost, Types, Subtypes, Text"
+)
+
+instant_partial_prompt = mtg_prompt_template.partial(
+    type="instant", card_keys="Name, Mana cost, Types, Subtypes, Text"
+)
+
+enchantment_partial_prompt = mtg_prompt_template.partial(
+    type="enchantment", card_keys="Name, Mana cost, Types, Subtypes, Text"
+)
+
+
+def generate_card_suggestions(
+    prompt, commander_data: pl.DataFrame, commander: str, theme: str
+) -> pd.DataFrame:
+    # use ic for each argument
+    for arg in [prompt, commander_data, commander, theme]:
+        ic(arg)
+
+    prompt = prompt.partial(commander=commander)
+    ic(prompt)
 
     hyde_embeddings = HypotheticalDocumentEmbedder.from_llm(
-        llm=llm, base_embeddings=embeddings, custom_prompt=prompt
+        llm=LLM, base_embeddings=EMBEDDINGS, custom_prompt=prompt
     )
+    ic(hyde_embeddings)
 
-    hyde_result = hyde_embeddings.embed_query(commander_data.to_dict(as_series=False))
+    hyde_result = hyde_embeddings.embed_query(
+        theme
+    )  # BUG: hyde_embeddings.embed_query({"commander": commander, "theme": theme}) complains about key error, again. I got around this last time but having a prompt with 1 arg left
 
-    hyde_search = vectorstore.similarity_search_by_vector_with_relevance_scores(
+    hyde_search = VECTORSTORE.similarity_search_by_vector_with_relevance_scores(
         hyde_result, k=20
     )
 
     suggestions = [document[0].metadata for document in hyde_search]
 
     # log if commander card name in metadata
+    # TODO: restructure the data prep into a separate function
     for item in suggestions:
         if commander in item["name"]:
-            log.info("Commander card in metadata", metadata=item)
+            LOG.info("Commander card in metadata", metadata=item)
 
     commander_identity = commander_data["colorIdentity"].to_list()[0]
 
@@ -183,17 +210,29 @@ def generate_card_suggestions(commander, prompt: PromptTemplate) -> pd.DataFrame
     return display_suggestions.to_pandas()
 
 
-commander = st.selectbox("Commander", commander_names)
+st.session_state.commander_name = st.selectbox("Commander", COMMANDER_NAMES)
 
-ic(commander)
+ic(st.session_state.commander_name)
 
-st.write(get_commander_data(commander))
+st.session_state.commander_data = get_commander_data(
+    commander=st.session_state.commander_name
+)
 
-suggestions = st.button("Get Card Suggestions")
+st.write(st.session_state.commander_data)
 
+if st.button("Generate deck theme suggestions"):
+    st.session_state.deck_theme_suggestion_1 = generate_deck_theme_suggestions(
+        st.session_state.commander_data
+    )
+    st.write(st.session_state.deck_theme_suggestion_1)
 
-if suggestions:
-    st.write("Creature Suggestions")
-    st.write(generate_card_suggestions(commander, creature_prompt))
-    st.write("Sorcery Suggestions")
-    st.write(generate_card_suggestions(commander, sorcery_prompt))
+if st.button("Use deck theme suggestion 1"):
+    st.session_state.deck_theme = st.session_state.deck_theme_suggestion_1
+    st.write(st.session_state.deck_theme)
+    st.session_state.suggestions = generate_card_suggestions(
+        prompt=creature_partial_prompt,
+        commander_data=st.session_state.commander_data,
+        commander=st.session_state.commander_name,
+        theme=st.session_state.deck_theme,
+    )
+    st.write(st.session_state.suggestions)
