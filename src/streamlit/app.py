@@ -52,33 +52,59 @@ def get_commander_data(commander) -> pd.DataFrame:
     )
 
 
-def generate_card_suggestions(commander) -> pd.DataFrame:
+creature_prompt = PromptTemplate.from_template(
+    """"
+    Design a single Magic the Gathering creature type card that would be valuable to include in a commander deck with {commander} as the commander. 
+    Do not suggest the commander card itself.
+    Your suggestions should be based on the commander's abilities and the general strategy of the deck.
+
+    Your response should be a card formated in json, each with the following information:
+    - Name
+    - Mana cost
+    - Supertypes
+    - Types
+    - Subtypes
+    - Text
+    - Power
+    - Toughness
+
+    Do not suggest to include the commander itself.
+
+    Do not include any extra information in the response.
+
+    Only use the commanders colour identity for the card.
+    """
+)
+
+sorcery_prompt = PromptTemplate.from_template(
+    """"
+    Design a single Magic the Gathering sorcery type card that would be valuable to include in a commander deck with {commander} as the commander. 
+    Do not suggest the commander card itself.
+    Your suggestions should be based on the commander's abilities and the general strategy of the deck.
+
+    Your response should be a card formated in json, each with the following information:
+    - Name
+    - Mana cost
+    - Supertypes
+    - Types
+    - Subtypes
+    - Text
+
+    Do not suggest to include the commander itself.
+
+    Do not include any extra information in the response.
+
+    Only use the commanders colour identity for the card.
+    """
+)
+
+
+def generate_card_suggestions(commander, prompt: PromptTemplate) -> pd.DataFrame:
     # return the commander tha matches the name
-    commander_data = commanders.filter(pl.col("name") == commander)
-
-    mtg_card_prompt = PromptTemplate.from_template(
-        """"
-        Design a Magic the Gathering card that would be valuable to include in a commander deck with {commander} as the commander. 
-        Do not suggest the commander card itself.
-        Your suggestions should be based on the commander's abilities and the general strategy of the deck.
-
-        Your response should be a card formated in json, each with the following information:
-        - Name
-        - Mana cost
-        - Supertypes
-        - Subtypes
-        - Text
-        - Power
-        - Toughness
-
-        Do not include the commander card in the suggestions.
-
-        Do not include any extra information in the response.
-        """
-    )
+    commander_data = commanders.filter(pl.col("name") == commander).drop("page_content")
 
     hyde_embeddings = HypotheticalDocumentEmbedder.from_llm(
-        llm=llm, base_embeddings=embeddings, custom_prompt=mtg_card_prompt
+        llm=llm, base_embeddings=embeddings, custom_prompt=prompt
     )
 
     hyde_result = hyde_embeddings.embed_query(commander_data.to_dict(as_series=False))
@@ -99,41 +125,53 @@ def generate_card_suggestions(commander) -> pd.DataFrame:
     def in_commander_colours(colors, color_list=commander_identity):
         return set(colors).issubset(set(color_list))
 
+    possible_suggestion_column_names = [
+        "name",
+        "manaCost",
+        "types",
+        "subtypes",
+        "text",
+        "power",
+        "toughness",
+        "in_commander_colours",
+    ]
+
     display_suggestions = (
         pl.DataFrame(suggestions)
         .with_columns(
             pl.col("colorIdentity")
             .str.split(by=", ")
-            .apply(in_commander_colours, return_dtype=pl.Boolean)
+            .map_elements(in_commander_colours, return_dtype=pl.Boolean)
             .alias("in_commander_colours"),
-        )
-        .select(
-            [
-                "name",
-                "colorIdentity",
-                "manaCost",
-                "types",
-                "subtypes",
-                "text",
-                # FIXME:will fail if no returns have power or toughness
-                # "power",
-                # "toughness",
-                "in_commander_colours",
-            ]
         )
         .filter(
             ~pl.col("name").str.contains(commander),
         )
     )
 
+    existing_columns = []
+    for column in possible_suggestion_column_names:
+        if column in display_suggestions.columns:
+            existing_columns.append(column)
+
+    display_suggestions = display_suggestions.select(existing_columns)
+
+    ic(display_suggestions)
+
     return display_suggestions.to_pandas()
 
 
 commander = st.selectbox("Commander", commander_names)
 
+ic(commander)
+
 st.write(get_commander_data(commander))
 
 suggestions = st.button("Get Card Suggestions")
 
+
 if suggestions:
-    st.write(generate_card_suggestions(commander))
+    st.write("Creature Suggestions")
+    st.write(generate_card_suggestions(commander, creature_prompt))
+    st.write("Sorcery Suggestions")
+    st.write(generate_card_suggestions(commander, sorcery_prompt))
