@@ -52,6 +52,28 @@ def get_commander_data(commander) -> pd.DataFrame:
     )
 
 
+def generate_deck_theme_suggestions(commander_data: pd.DataFrame) -> str:
+    """Generate deck theme suggestions based on the commander's abilities and general strategy of the deck."""
+    deck_theme_prompt = PromptTemplate.from_template(
+        """"
+        Suggest a theme for a commander deck with {commander} as the commander. 
+        Your suggestion should be based on the commander's abilities and the general strategy of the deck.
+
+        Do not suggest the commander card itself.
+
+        Do not include any extra information in the response.
+        """
+    )
+
+    theme_chain = deck_theme_prompt | llm
+
+    commander_description = commander_data.to_dict(orient="records")
+
+    theme_result = theme_chain.invoke({"commander": commander_description})
+
+    return theme_result
+
+
 creature_prompt = PromptTemplate.from_template(
     """"
     Design a single Magic the Gathering creature type card that would be valuable to include in a commander deck with {commander} as the commander. 
