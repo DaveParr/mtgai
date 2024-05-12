@@ -1,14 +1,10 @@
-import logging
-
-import comm
 import pandas as pd
 import polars as pl
 import streamlit as st
 import structlog
-from click import command
 from langchain.chains import HypotheticalDocumentEmbedder
 from langchain.globals import set_debug
-from langchain.prompts import PromptTemplate
+from langchain.prompts import BasePromptTemplate, PromptTemplate
 from langchain_chroma import Chroma
 from langchain_openai import OpenAI, OpenAIEmbeddings
 
@@ -115,31 +111,28 @@ mtg_prompt_template = PromptTemplate.from_template(
     """
 )
 
-
-sorcery_partial_prompt = mtg_prompt_template.partial(
-    type="sorcery", card_keys="Name, Mana cost, Types, Subtypes, Text"
-)
-
-creature_partial_prompt = mtg_prompt_template.partial(
-    type="creature",
-    card_keys="Name, Mana cost, Types, Subtypes, Text, Power, Toughness",
-)
-
-artifact_partial_prompt = mtg_prompt_template.partial(
-    type="artifact", card_keys="Name, Mana cost, Types, Subtypes, Text"
-)
-
-instant_partial_prompt = mtg_prompt_template.partial(
-    type="instant", card_keys="Name, Mana cost, Types, Subtypes, Text"
-)
-
-enchantment_partial_prompt = mtg_prompt_template.partial(
-    type="enchantment", card_keys="Name, Mana cost, Types, Subtypes, Text"
-)
+partial_prompts = {
+    "creatures": mtg_prompt_template.partial(
+        type="creature",
+        card_keys="Name, Mana cost, Types, Subtypes, Text, Power, Toughness",
+    ),
+    "artifacts": mtg_prompt_template.partial(
+        type="artifact", card_keys="Name, Mana cost, Types, Subtypes, Text"
+    ),
+    "instants": mtg_prompt_template.partial(
+        type="instant", card_keys="Name, Mana cost, Types, Subtypes, Text"
+    ),
+    "enchantments": mtg_prompt_template.partial(
+        type="enchantment", card_keys="Name, Mana cost, Types, Subtypes, Text"
+    ),
+    "sorceries": mtg_prompt_template.partial(
+        type="sorcery", card_keys="Name, Mana cost, Types, Subtypes, Text"
+    ),
+}
 
 
 def generate_card_suggestions(
-    prompt, commander_data: pl.DataFrame, commander: str, theme: str
+    prompt: BasePromptTemplate, commander_data: pl.DataFrame, commander: str, theme: str
 ) -> pd.DataFrame:
     # use ic for each argument
     for arg in [prompt, commander_data, commander, theme]:
@@ -205,14 +198,10 @@ def generate_card_suggestions(
 
     display_suggestions = display_suggestions.select(existing_columns)
 
-    ic(display_suggestions)
-
     return display_suggestions.to_pandas()
 
 
-st.session_state.commander_name = st.selectbox("Commander", COMMANDER_NAMES)
-
-ic(st.session_state.commander_name)
+st.session_state.commander_name: str = st.selectbox("Commander", COMMANDER_NAMES)
 
 st.session_state.commander_data = get_commander_data(
     commander=st.session_state.commander_name
@@ -226,13 +215,63 @@ if st.button("Generate deck theme suggestions"):
     )
     st.write(st.session_state.deck_theme_suggestion_1)
 
+    st.session_state.deck_theme_suggestion_2 = generate_deck_theme_suggestions(
+        st.session_state.commander_data
+    )
+    st.write(st.session_state.deck_theme_suggestion_2)
+
 if st.button("Use deck theme suggestion 1"):
     st.session_state.deck_theme = st.session_state.deck_theme_suggestion_1
-    st.write(st.session_state.deck_theme)
-    st.session_state.suggestions = generate_card_suggestions(
-        prompt=creature_partial_prompt,
-        commander_data=st.session_state.commander_data,
-        commander=st.session_state.commander_name,
-        theme=st.session_state.deck_theme,
+
+    st.write("## Choosen theme", st.session_state.deck_theme)
+
+    st.session_state.suggestions = {
+        card_type: generate_card_suggestions(
+            prompt=prompt,
+            commander_data=st.session_state.commander_data,
+            commander=st.session_state.commander_name,
+            theme=st.session_state.deck_theme,
+        )
+        for card_type, prompt in partial_prompts.items()
+    }
+
+    st.write(
+        "## Creatures",
+        st.session_state.suggestions.get("creatures"),
+        "## Enchantments",
+        st.session_state.suggestions.get("enchantments"),
+        "## Artifacts",
+        st.session_state.suggestions.get("artifacts"),
+        "## Instants",
+        st.session_state.suggestions.get("instants"),
+        "## Sorceries",
+        st.session_state.suggestions.get("sorceries"),
     )
-    st.write(st.session_state.suggestions)
+
+elif st.button("Use deck theme suggestion 2"):
+    st.session_state.deck_theme = st.session_state.deck_theme_suggestion_2
+
+    st.write("## Choosen theme", st.session_state.deck_theme)
+
+    st.session_state.suggestions = {
+        card_type: generate_card_suggestions(
+            prompt=prompt,
+            commander_data=st.session_state.commander_data,
+            commander=st.session_state.commander_name,
+            theme=st.session_state.deck_theme,
+        )
+        for card_type, prompt in partial_prompts.items()
+    }
+
+    st.write(
+        "## Creatures",
+        st.session_state.suggestions.get("creatures"),
+        "## Enchantments",
+        st.session_state.suggestions.get("enchantments"),
+        "## Artifacts",
+        st.session_state.suggestions.get("artifacts"),
+        "## Instants",
+        st.session_state.suggestions.get("instants"),
+        "## Sorceries",
+        st.session_state.suggestions.get("sorceries"),
+    )
