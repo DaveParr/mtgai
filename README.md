@@ -53,10 +53,23 @@ Project Organization
     │   │
     │   └── visualization  <- Scripts to create exploratory and results oriented visualizations
     │       └── visualize.py
-    │
+    ├── .env            <- Environment configuration file THAT YOU MUST MAKE MAUNALLY
     └── tox.ini            <- tox file with settings for running tox; see tox.readthedocs.io
 
 
 --------
 
+
+## Make the .env
+
+You need to start a new file in the root and write the relevant settings for the project.
+It looks like this:
+
+```bash
+OPENAI_API_KEY=sk-...
+OPENAI_ORG_ID='org-...'
+LANGCHAIN_PROJECT="mtgai"
+LANGCHAIN_API_KEY='ls__...'
+LANGCHAIN_TRACING_V2=True
+```
 <p><small>Project based on the <a target="_blank" href="https://drivendata.github.io/cookiecutter-data-science/">cookiecutter data science project template</a>. #cookiecutterdatascience</small></p>

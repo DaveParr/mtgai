@@ -6,13 +6,7 @@ import click
 import polars as pl
 import structlog
 from dotenv import find_dotenv, load_dotenv
-from langchain.vectorstores import Chroma
-from langchain_community.document_loaders import PolarsDataFrameLoader
-from langchain_community.vectorstores.utils import filter_complex_metadata
-from langchain_openai import OpenAIEmbeddings
-from sqlalchemy import column
 
-# Get a logger.
 LOG = structlog.get_logger()
 
 
@@ -25,19 +19,13 @@ def read_data(path: str) -> pl.DataFrame:
 def filter_main_sets(
     x: pl.DataFrame, sets: pl.DataFrame, cutoff_date: date
 ) -> pl.DataFrame:
-    filtered_sets = (
-        sets.with_columns(
-            pl.col("releaseDate").str.to_date("%Y-%m-%d").alias("releaseDate"),
-            pl.col("code").alias("setCode"),
-        )
-        .filter(
-            (pl.col("releaseDate") > cutoff_date)
-            & (pl.col("isOnlineOnly") != True)
-            & pl.col("type").is_in(
-                ["core", "expansion", "commander", "draft_innovation"]
-            )
-        )
-        .join(x, on="setCode", validate="1:m")
+    filtered_sets = sets.with_columns(
+        pl.col("releaseDate").str.to_date("%Y-%m-%d").alias("releaseDate"),
+        pl.col("code").alias("setCode"),
+    ).filter(
+        (pl.col("releaseDate") > cutoff_date)
+        & (pl.col("isOnlineOnly") != True)
+        & pl.col("type").is_in(["core", "expansion", "commander", "draft_innovation"])
     )
 
     LOG.debug(
@@ -46,7 +34,7 @@ def filter_main_sets(
         columns=filtered_sets.columns,
         n=filtered_sets.height,
     )
-    return filtered_sets
+    return x.join(filtered_sets, on="setCode")
 
 
 def collapse_sets(
@@ -121,7 +109,7 @@ def create_commander_selections(
     type=click.DateTime(formats=["%Y-%m-%d"]),
     default=date.today(),
     help="Cutoff date for sets",
-)
+)  # TODO: Make this date setable via the cli call
 def main(input_filepath, output_filepath, cutoff_date: date):
     """Runs data processing scripts to turn raw data from (../raw) into
     cleaned data ready to be analyzed (saved in ../processed).
@@ -153,9 +141,6 @@ def main(input_filepath, output_filepath, cutoff_date: date):
 
 
 if __name__ == "__main__":
-    log_fmt = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    logging.basicConfig(level=logging.INFO, format=log_fmt)
-
     # not used in this stub but often useful for finding various files
     project_dir = Path(__file__).resolve().parents[2]
 
@@ -164,22 +149,3 @@ if __name__ == "__main__":
     load_dotenv(find_dotenv())
 
     main()
-
-    # # # TODO: break into `make vectorstore` command
-    # loader = PolarsDataFrameLoader(processed_data, page_content_column="page_content")
-
-    # documents = loader.load()
-
-    # LOG.info("Loaded documents", first=documents[0], n=len(documents))
-
-    # filtered_documents = filter_complex_metadata(documents)
-
-    # LOG.info(
-    #     "Filtered documents", first=filtered_documents[0], n=len(filtered_documents)
-    # )
-
-    # embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
-    # vectorstore = Chroma.from_documents(
-    #     filtered_documents, embeddings, persist_directory="data/vectorstore"
-    # )
-    # LOG.info("Created vectorstore", vectorstore=vectorstore)

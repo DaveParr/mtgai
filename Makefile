@@ -33,13 +33,16 @@ raw: requirements
 processed: requirements
 	$(PYTHON_INTERPRETER) src/data/make_processed.py data/raw data/processed --cutoff_date=2023-1-1
 
-## Make all datasets
-data: raw_data processed_data
-
-# TODO: implement vectorstore function
 ## Make vectorstore from processed dataset
 vectorstore: requirements
 	$(PYTHON_INTERPRETER) src/data/make_vectorstore.py data/processed data/vectorstore
+
+## Make all datasets
+data: raw processed vectorstore
+
+## Start the streamlit application
+app: requirements
+	@streamlit run src/app/app.py
 
 ## Delete all compiled Python files
 clean:
