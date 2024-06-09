@@ -1,0 +1,3 @@
+*.bin
+*.pickle
+*.sqlite3

@@ -13,7 +13,8 @@ Project Organization
     │   ├── external       <- Data from third party sources.
     │   ├── interim        <- Intermediate data that has been transformed.
     │   ├── processed      <- The final, canonical data sets for modeling.
-    │   └── raw            <- The original, immutable data dump.
+    │   ├── raw            <- The original, immutable data dump.
+    │   └── vectorstore    <- Directory for vector store data.
     │
     ├── docs               <- A default Sphinx project; see sphinx-doc.org for details
     │
@@ -35,8 +36,12 @@ Project Organization
     ├── src                <- Source code for use in this project.
     │   ├── __init__.py    <- Makes src a Python module
     │   │
+    │   ├── app            <- Directory for the application code.
+    │   │
     │   ├── data           <- Scripts to download or generate data
-    │   │   └── make_dataset.py
+    │   │   ├── make_raw.py
+    │   │   ├── make_procesed.py 
+    │   │   └── make_vectorstore.py
     │   │
     │   ├── features       <- Scripts to turn raw data into features for modeling
     │   │   └── build_features.py
@@ -48,10 +53,23 @@ Project Organization
     │   │
     │   └── visualization  <- Scripts to create exploratory and results oriented visualizations
     │       └── visualize.py
-    │
+    ├── .env            <- Environment configuration file THAT YOU MUST MAKE MAUNALLY
     └── tox.ini            <- tox file with settings for running tox; see tox.readthedocs.io
 
 
 --------
 
+
+## Make the .env
+
+You need to start a new file in the root and write the relevant settings for the project.
+It looks like this:
+
+```bash
+OPENAI_API_KEY=sk-...
+OPENAI_ORG_ID='org-...'
+LANGCHAIN_PROJECT="mtgai"
+LANGCHAIN_API_KEY='ls__...'
+LANGCHAIN_TRACING_V2=True
+```
 <p><small>Project based on the <a target="_blank" href="https://drivendata.github.io/cookiecutter-data-science/">cookiecutter data science project template</a>. #cookiecutterdatascience</small></p>

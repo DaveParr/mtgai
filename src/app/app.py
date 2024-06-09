@@ -19,9 +19,9 @@ except ImportError:  # Graceful fallback if IceCream isn't installed.
 EMBEDDINGS = OpenAIEmbeddings(model="text-embedding-3-large")
 
 VECTORSTORE = Chroma(
-    persist_directory="src/gradio/chroma",
+    persist_directory="data/vectorstore",
 )
-COMMANDERS = pl.read_parquet("src/streamlit/commanders.parquet")
+COMMANDERS = pl.read_parquet("data/processed/commanders.parquet")
 
 COMMANDER_NAMES = COMMANDERS["name"].to_list()
 
