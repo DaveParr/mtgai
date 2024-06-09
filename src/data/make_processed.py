@@ -1,8 +1,11 @@
 import logging
 from datetime import date
+from pathlib import Path
 
+import click
 import polars as pl
 import structlog
+from dotenv import find_dotenv, load_dotenv
 from langchain.vectorstores import Chroma
 from langchain_community.document_loaders import PolarsDataFrameLoader
 from langchain_community.vectorstores.utils import filter_complex_metadata
@@ -15,7 +18,7 @@ LOG = structlog.get_logger()
 
 def read_data(path: str) -> pl.DataFrame:
     data = pl.read_parquet(path)
-    LOG.debug("Read data", data=data.describe())
+    LOG.debug("Read data", data=data.describe(), path=path)
     return data
 
 
@@ -38,7 +41,10 @@ def filter_main_sets(
     )
 
     LOG.debug(
-        "Filtered data", data=filtered_sets.describe(), columns=filtered_sets.columns
+        "Filtered data",
+        data=filtered_sets.describe(),
+        columns=filtered_sets.columns,
+        n=filtered_sets.height,
     )
     return filtered_sets
 
@@ -107,15 +113,26 @@ def create_commander_selections(
     return commander_selections
 
 
-if __name__ == "__main__":
-    log_fmt = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    logging.basicConfig(level=logging.INFO, format=log_fmt)
+@click.command()
+@click.argument("input_filepath", type=click.Path(exists=True))
+@click.argument("output_filepath", type=click.Path())
+@click.option(
+    "--cutoff_date",
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    default=date.today(),
+    help="Cutoff date for sets",
+)
+def main(input_filepath, output_filepath, cutoff_date: date):
+    """Runs data processing scripts to turn raw data from (../raw) into
+    cleaned data ready to be analyzed (saved in ../processed).
+    """
+    print(date)
 
     cards_data = read_data("data/raw/cards.parquet")
     sets = read_data("data/raw/sets.parquet")
 
     processed_data: pl.DataFrame = (
-        cards_data.pipe(filter_main_sets, sets=sets, cutoff_date=date(2023, 1, 1))
+        cards_data.pipe(filter_main_sets, sets=sets, cutoff_date=cutoff_date)
         .pipe(collapse_sets)
         .pipe(create_page_content)
     )
@@ -134,18 +151,32 @@ if __name__ == "__main__":
 
     LOG.info("Wrote commanders", data=commanders.describe())
 
-    # # TODO: break into `make vectorstore` command
-    loader = PolarsDataFrameLoader(processed_data, page_content_column="page_content")
 
-    documents = loader.load()
+if __name__ == "__main__":
+    log_fmt = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    logging.basicConfig(level=logging.INFO, format=log_fmt)
 
-    LOG.info("Loaded documents", first=documents[0], n=len(documents))
+    # not used in this stub but often useful for finding various files
+    project_dir = Path(__file__).resolve().parents[2]
 
-    filtered_documents = filter_complex_metadata(documents)
+    # find .env automagically by walking up directories until it's found, then
+    # load up the .env entries as environment variables
+    load_dotenv(find_dotenv())
 
-    LOG.info(
-        "Filtered documents", first=filtered_documents[0], n=len(filtered_documents)
-    )
+    main()
+
+    # # # TODO: break into `make vectorstore` command
+    # loader = PolarsDataFrameLoader(processed_data, page_content_column="page_content")
+
+    # documents = loader.load()
+
+    # LOG.info("Loaded documents", first=documents[0], n=len(documents))
+
+    # filtered_documents = filter_complex_metadata(documents)
+
+    # LOG.info(
+    #     "Filtered documents", first=filtered_documents[0], n=len(filtered_documents)
+    # )
 
     # embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
     # vectorstore = Chroma.from_documents(
