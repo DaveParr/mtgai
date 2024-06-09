@@ -6,7 +6,8 @@ from langchain.chains import HypotheticalDocumentEmbedder
 from langchain.globals import set_debug
 from langchain.prompts import BasePromptTemplate, PromptTemplate
 from langchain_chroma import Chroma
-from langchain_openai import OpenAI, OpenAIEmbeddings
+from langchain_core.pydantic_v1 import BaseModel, Field
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
 set_debug(True)
 
@@ -26,7 +27,8 @@ COMMANDER_NAMES = COMMANDERS["name"].to_list()
 
 LOG = structlog.get_logger()
 
-LLM = OpenAI()
+
+LLM = ChatOpenAI(model="gpt-3.5-turbo-0125")
 
 
 def get_commander_data(commander: str) -> pd.DataFrame:
@@ -48,61 +50,100 @@ def get_commander_data(commander: str) -> pd.DataFrame:
     )
 
 
+class DeckThemes(BaseModel):
+    theme_name_1: str = Field(description="Name of the first theme")
+    theme_description_1: str = Field(description="Description of the first theme")
+    theme_mechanics_1: str = Field(description="Mechanics of the first theme")
+    theme_name_2: str = Field(description="Name of the second theme")
+    theme_description_2: str = Field(description="Description of the second theme")
+    theme_mechanics_2: str = Field(description="Mechanics of the second theme")
+
+
 @st.cache_data
-def generate_deck_theme_suggestion(commander_data: pd.DataFrame) -> str:
+def generate_deck_theme_suggestion(commander_data: pd.DataFrame) -> DeckThemes:
     """Generate deck theme suggestion based on the commander's abilities and general strategy of the deck."""
     deck_theme_prompt = PromptTemplate.from_template(
         """"
-        Suggest a theme for a commander deck with {commander} as the commander.
+        Suggest two different themes for a commander deck with {commander} as the commander.
 
         Do not suggest the commander card itself.
 
         Do not include any extra information in the response.
 
         Keep your theme description short and focussed on the commander's abilities.
+
+        Suggest two themes that are different from each other.
+
+        Example:
+        commander_input:{{
+            "name": "Urza, Chief Artificer",
+            "colorIdentity": "B, U, W",
+            "manaCost": "{{3}}{{W}}{{U}}{{B}}",
+            "types": "Creature",
+            "subtypes": "Human, Artificer",
+            "text": "Affinity for artifact creatures (This spell costs {{1}} less to cast for each artifact creature you control.)\nArtifact creatures you control have menace.\nAt the beginning of your end step, create a 0/0 colorless Construct artifact creature token with "This creature gets +1/+1 for each artifact you control.",
+            "power": "4",
+            "toughness": "5"
+            }}
+        theme_output:{{
+            theme_name_1: "Artifact Affinity"
+            theme_description_1: "Go wide with artifact creatures to maximise affinity and construct tokens power and toughness"
+            theme_mechanics_1: "Affinity, Artifact token generation"
+            theme_name_2: "Artifact Aggro"
+            theme_description_2: "Focus on attacking with artifact creatures that benefit from gaining menance"
+            theme_mechanics_2: "Menace, Artifact creature synergy"
+        }}
+        Example:
+        commander_input:{{
+            "name": "Krenko, Mob Boss",
+            "colorIdentity": "R",
+            "manaCost": "{{2}}{{R}}",
+            "types": "Creature",
+            "subtypes": "Goblin",
+            "text": "Tap: Create X 1/1 red Goblin creature tokens, where X is the number of Goblins you control.",
+            "power": "3",
+            "toughness": "3"
+            }}
+        theme_output:{{
+            theme_name_1: "Goblin Tribal"
+            theme_description_1: "Create a swarm of goblin tokens and use them to overwhelm your opponents"
+            theme_mechanics_1: "Token generation, Goblin synergy"
+            theme_name_2: "Goblin Aggro"
+            theme_description_2: "Focus on attacking with goblin tokens that benefit from gaining haste"
+            theme_mechanics_2: "Haste, Goblin creature synergy"
+        }}
+        Example:
+        commander_input:{{
+            "name": "Atraxa, Praetors' Voice",
+            "colorIdentity": "B, G, U, W",
+            "manaCost": "{{2}}{{W}}{{U}}{{B}}{{G}}",
+            "types": "Creature",
+            "subtypes": "Angel, Horror, Praetor",
+            "text": "Flying, vigilance, deathtouch, lifelink\nAt the beginning of your end step, proliferate.",
+            "power": "4",
+            "toughness": "4"
+            }}
+        theme_output:{{
+            theme_name_1: "Superfriends"
+            theme_description_1: "Focus on planeswalkers and proliferate to maximise their loyalty counters"
+            theme_mechanics_1: "Proliferate, Planeswalker synergy"
+            theme_name_2: "Voltron"
+            theme_description_2: "Focus on attacking with Atraxa to maximise the number of counters on her"
+            theme_mechanics_2: "Counter synergy, Voltron strategy"
+        }}
         """
     )
-    ic(deck_theme_prompt)
 
-    theme_chain = deck_theme_prompt | LLM
+    theme_structured_llm = LLM.with_structured_output(DeckThemes)
+
+    theme_chain = deck_theme_prompt | theme_structured_llm
 
     commander_description = commander_data.to_dict(orient="records")
 
     theme_result = theme_chain.invoke({"commander": commander_description})
 
-    return theme_result
-
-
-@st.cache_data
-def generate_another_theme_suggestion(
-    commander_data: pd.DataFrame, previous_theme
-) -> str:
-    """Generate another deck theme suggestion based on the commander's abilities and general strategy of the deck."""
-    deck_theme_prompt = PromptTemplate.from_template(
-        """"
-        Suggest a theme for a commander deck with {commander} as the commander.
-
-        Do not suggest the commander card itself.
-
-        Do not include any extra information in the response.
-
-        Keep your theme description short and focussed on the commander's abilities.
-
-        Make a suggestion that is different from the previous theme.
-
-        The previous theme was: {previous_theme}
-        """
-    )
-
-    # TODO: Make the theme suggestion even more different from the previous theme
-
-    theme_chain = deck_theme_prompt | LLM
-
-    commander_description = commander_data.to_dict(orient="records")
-
-    theme_result = theme_chain.invoke(
-        {"commander": commander_description, "previous_theme": previous_theme}
-    )
+    if type(theme_result) is not DeckThemes:
+        raise ValueError("Invalid response from theme generation")
 
     return theme_result
 
@@ -141,11 +182,20 @@ partial_prompts = {
     "sorceries": mtg_prompt_template.partial(
         type="sorcery", card_keys="Name, Mana cost, Types, Subtypes, Text"
     ),
+    "lands": mtg_prompt_template.partial(
+        type="land", card_keys="Name, Types, Subtypes, Text"
+    ),
+    "planeswalkers": mtg_prompt_template.partial(
+        type="planeswalker", card_keys="Name, Mana cost, Types, Subtypes, Text, Loyalty"
+    ),
+    "sagas": mtg_prompt_template.partial(
+        type="saga", card_keys="Name, Mana cost, Types, Subtypes, Text"
+    ),
 }
 
 
 def generate_card_suggestions(
-    prompt: BasePromptTemplate, commander_data: pl.DataFrame, commander: str, theme: str
+    prompt: BasePromptTemplate, commander_data: pd.DataFrame, commander: str, theme: str
 ) -> pd.DataFrame:
     prompt = prompt.partial(commander=commander)
 
@@ -184,7 +234,7 @@ def generate_card_suggestions(
         "in_commander_colours",
     ]
 
-    display_suggestions = (
+    display_suggestions: pl.DataFrame = (
         pl.DataFrame(suggestions)
         .with_columns(
             pl.col("colorIdentity")
@@ -205,6 +255,12 @@ def generate_card_suggestions(
     display_suggestions = display_suggestions.select(existing_columns)
 
     return display_suggestions.to_pandas()
+
+
+def combine_in_colour_suggestions(suggestions: dict) -> pd.DataFrame:
+    df = pd.concat(suggestions.values()).drop_duplicates()
+
+    return df[df.in_commander_colours]
 
 
 st.session_state.commander_name = str(st.selectbox("Commander", COMMANDER_NAMES))
@@ -231,21 +287,25 @@ st.button("Generate deck theme suggestions", on_click=click_theme_button)
 if st.session_state.themes_generated:
     st.session_state.themes = generate_deck_theme_suggestion(
         st.session_state.commander_data
-    )
-
-    st.session_state.themes = {
-        "a": generate_deck_theme_suggestion(st.session_state.commander_data),
-        "b": generate_another_theme_suggestion(
-            st.session_state.commander_data, st.session_state.themes
-        ),
-    }
+    ).dict()
 
     st.session_state.selected_theme = st.radio(
         "Choose a deck theme suggestion",
-        options=[st.session_state.themes["a"], st.session_state.themes["b"]],
+        options=[
+            st.session_state.themes["theme_name_1"]
+            + " - "
+            + st.session_state.themes["theme_description_1"]
+            + " - "
+            + st.session_state.themes["theme_mechanics_1"],
+            st.session_state.themes["theme_name_2"]
+            + " - "
+            + st.session_state.themes["theme_description_2"]
+            + " - "
+            + st.session_state.themes["theme_mechanics_2"],
+        ],
     )
 
-    if st.button("Generate card suggestions"):
+    if st.button("Generate card suggestions") and st.session_state.selected_theme:
         st.session_state.suggestions = {
             card_type: generate_card_suggestions(
                 prompt=prompt,
@@ -256,18 +316,13 @@ if st.session_state.themes_generated:
             for card_type, prompt in partial_prompts.items()
         }
 
-        # TODO: Instead of displaying each suggestion data set based on the expected input card type, aggregate them, then split into the actual types
+        st.session_state.all_in_colour_suggestions = combine_in_colour_suggestions(
+            st.session_state.suggestions
+        )
+
         # TODO: Instead of displaying the vectors based on similarity, have them filtered/ reranked by an llm
 
         st.write(
-            "## Creatures",
-            st.session_state.suggestions.get("creatures"),
-            "## Enchantments",
-            st.session_state.suggestions.get("enchantments"),
-            "## Artifacts",
-            st.session_state.suggestions.get("artifacts"),
-            "## Instants",
-            st.session_state.suggestions.get("instants"),
-            "## Sorceries",
-            st.session_state.suggestions.get("sorceries"),
+            "## Suggestions",
+            st.session_state.all_in_colour_suggestions,
         )
