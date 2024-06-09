@@ -1,5 +1,5 @@
 import logging
-from typing import Union
+from datetime import date
 
 import polars as pl
 import structlog
@@ -7,6 +7,7 @@ from langchain.vectorstores import Chroma
 from langchain_community.document_loaders import PolarsDataFrameLoader
 from langchain_community.vectorstores.utils import filter_complex_metadata
 from langchain_openai import OpenAIEmbeddings
+from sqlalchemy import column
 
 # Get a logger.
 LOG = structlog.get_logger()
@@ -19,62 +20,32 @@ def read_data(path: str) -> pl.DataFrame:
 
 
 def filter_main_sets(
-    x: Union[pl.DataFrame, pl.LazyFrame],
-) -> Union[pl.DataFrame, pl.LazyFrame]:
-    recent_main_sets = {
-        "ELD": "Throne of Eldraine",
-        "THB": "Theros Beyond Death",
-        "IKO": "Ikoria: Lair of Behemoths",
-        "C20": "Commander 2020",
-        "M21": "Core Set 2021",
-        "ZNR": "Zendikar Rising",
-        "ZNC": "Zendikar Rising Commander Decks",
-        "CMR": "Commander Legends",
-        "KHM": "Kaldheim",
-        "KHC": "Kaldheim Commander Decks",
-        "STX": "Strixhaven: School of Mages",
-        "C21": "Commander 2021",
-        "AFR": "Dungeons & Dragons: Adventures in the Forgotten Realms",
-        "AFC": "Dungeons & Dragons: Adventures in the Forgotten Realms Commander Decks",
-        "MID": "Innistrad: Midnight Hunt",
-        "MIC": "Innistrad: Midnight Hunt Commander Decks",
-        "VOW": "Innistrad: Crimson Vow",
-        "VOC": "Innistrad: Crimson Vow Commander Decks",
-        "NEO": "Kamigawa: Neon Dynasty",
-        "NEC": "Kamigawa: Neon Dynasty Commander Decks",
-        "SNC": "Streets of New Capenna",
-        "NCC": "Streets of New Capenna Commander Decks",
-        "CLB": "Commander Legends: Battle for Baldur's Gate",
-        "DMU": "Dominaria United",
-        "DMC": "Dominaria United Commander Decks",
-        "UNF": "Unfinity",
-        "40K": "Warhammer 40,000 Commander Decks",
-        "BRO": "The Brothers' War",
-        "BRC": "The Brothers' War Commander Decks",
-        "ONE": "Phyrexia: All Will Be One",
-        "ONC": "Phyrexia: All Will Be One Commander Decks",
-        "MOM": "March of the Machine",
-        "MOC": "March of the Machine/Commander decks",
-        "LTR": "The Lord of the Rings: Tales of Middle-Earth",
-        "LTC": "The Lord of the Rings: Tales of Middle-Earth Commander Decks",
-        "WOE": "Wilds of Eldraine",
-        "WOC": "Wilds of Eldraine/Commander decks",
-        "LCI": "The Lost Caverns of Ixalan",
-        "LCC": "The Lost Caverns of Ixalan/Commander decks",
-        "MKM": "Murders at Karlov Manor",
-        "MKC": "Murders at Karlov Manor/Commander decks",
-        "PIP": "Fallout",
-        "OTJ": "Outlaws",
-    }
-    x_filtered = x.filter(pl.col("setCode").is_in(list(recent_main_sets.keys())))
+    x: pl.DataFrame, sets: pl.DataFrame, cutoff_date: date
+) -> pl.DataFrame:
+    filtered_sets = (
+        sets.with_columns(
+            pl.col("releaseDate").str.to_date("%Y-%m-%d").alias("releaseDate"),
+            pl.col("code").alias("setCode"),
+        )
+        .filter(
+            (pl.col("releaseDate") > cutoff_date)
+            & (pl.col("isOnlineOnly") != True)
+            & pl.col("type").is_in(
+                ["core", "expansion", "commander", "draft_innovation"]
+            )
+        )
+        .join(x, on="setCode", validate="1:m")
+    )
 
-    LOG.debug("Filtered data", data=x_filtered.describe())
-    return x_filtered
+    LOG.debug(
+        "Filtered data", data=filtered_sets.describe(), columns=filtered_sets.columns
+    )
+    return filtered_sets
 
 
 def collapse_sets(
-    x: Union[pl.DataFrame, pl.LazyFrame],
-) -> Union[pl.DataFrame, pl.LazyFrame]:
+    x: pl.DataFrame,
+) -> pl.DataFrame:
     x_collapsed = (
         x.group_by(
             "name",
@@ -103,8 +74,8 @@ def collapse_sets(
 
 
 def create_page_content(
-    x: Union[pl.DataFrame, pl.LazyFrame],
-) -> Union[pl.DataFrame, pl.LazyFrame]:
+    x: pl.DataFrame,
+) -> pl.DataFrame:
     with_page_contents = x.with_columns(
         page_content=pl.col("type")
         + pl.col("text").fill_null("")
@@ -119,13 +90,14 @@ def create_page_content(
 
 
 def create_commander_selections(
-    x: Union[pl.DataFrame, pl.LazyFrame],
-) -> Union[pl.DataFrame, pl.LazyFrame]:
-    # name does not start with "A-"
+    x: pl.DataFrame,
+) -> pl.DataFrame:
     commander_selections = x.filter(
         (pl.col("types") == "Creature")
         & (pl.col("supertypes") == "Legendary")
-        & ~pl.col("name").str.starts_with("A-")  # untested
+        & ~pl.col("name").str.starts_with(
+            "A-"
+        )  # name does not start with "A-" because might be 'alchemy' cards?
     )
     LOG.debug(
         "Commander data",
@@ -136,18 +108,16 @@ def create_commander_selections(
 
 
 if __name__ == "__main__":
-    # set log to info
     log_fmt = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     logging.basicConfig(level=logging.INFO, format=log_fmt)
 
-    data = read_data("data/raw/cards.parquet")
+    cards_data = read_data("data/raw/cards.parquet")
+    sets = read_data("data/raw/sets.parquet")
 
-    processed_data = (
-        data.lazy()
-        .pipe(filter_main_sets)
+    processed_data: pl.DataFrame = (
+        cards_data.pipe(filter_main_sets, sets=sets, cutoff_date=date(2023, 1, 1))
         .pipe(collapse_sets)
         .pipe(create_page_content)
-        .collect()
     )
 
     LOG.info(
@@ -158,12 +128,13 @@ if __name__ == "__main__":
 
     processed_data.write_parquet("data/processed/processed_data.parquet")
 
-    commanders = create_commander_selections(processed_data)
+    commanders: pl.DataFrame = create_commander_selections(processed_data)
 
     commanders.write_parquet("data/processed/commanders.parquet")
 
     LOG.info("Wrote commanders", data=commanders.describe())
 
+    # # TODO: break into `make vectorstore` command
     loader = PolarsDataFrameLoader(processed_data, page_content_column="page_content")
 
     documents = loader.load()
@@ -176,7 +147,6 @@ if __name__ == "__main__":
         "Filtered documents", first=filtered_documents[0], n=len(filtered_documents)
     )
 
-    # TODO: break into `make vectorstore` command
     # embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
     # vectorstore = Chroma.from_documents(
     #     filtered_documents, embeddings, persist_directory="data/vectorstore"

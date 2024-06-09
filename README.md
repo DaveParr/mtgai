@@ -39,8 +39,9 @@ Project Organization
     │   ├── app            <- Directory for the application code.
     │   │
     │   ├── data           <- Scripts to download or generate data
-    │   │   ├── make_data.py
-    │   │   └── make_commander.py
+    │   │   ├── make_raw.py
+    │   │   ├── make_procesed.py 
+    │   │   └── make_vectorstore.py
     │   │
     │   ├── features       <- Scripts to turn raw data into features for modeling
     │   │   └── build_features.py
