@@ -10,29 +10,30 @@ import structlog
 from dotenv import find_dotenv, load_dotenv
 
 
-def download_cards_parquet(raw_directory):
+def download_mtgjson_parquet(raw_directory, url):
     log = structlog.get_logger()
-
-    url = "https://mtgjson.com/api/v5/parquet/cards.parquet.zip"
 
     log.info("Downloading zip file", url=url)
     response = requests.get(url)
 
-    raw_cards_filepath = raw_directory + "/cards.parquet.zip"
+    file_name_with_zip = url.split("/")[-1]
+    file_name = file_name_with_zip.replace(".zip", "")
+
+    raw_cards_filepath = raw_directory + "/" + file_name_with_zip
 
     log.info("Writing zip file", filepath=raw_cards_filepath)
     with open(raw_cards_filepath, "wb") as file:
         file.write(response.content)
 
     log.info("Reading parquet file", filepath=raw_cards_filepath)
-    cards = pl.read_parquet(ZipFile(raw_cards_filepath).read("cards.parquet"))
+    data = pl.read_parquet(ZipFile(raw_cards_filepath).read(file_name))
 
-    cards.describe()
+    data.describe()
 
     log.info("Saving parquet file", filepath=raw_directory)
-    cards.write_parquet(raw_directory + "/cards.parquet")
+    data.write_parquet(raw_directory + "/" + file_name)
 
-    return cards
+    return data
 
 
 @click.command()
@@ -42,10 +43,15 @@ def main(input_filepath, output_filepath):
     """Runs data processing scripts to turn raw data from (../raw) into
     cleaned data ready to be analyzed (saved in ../processed).
     """
-    logger = logging.getLogger(__name__)
-    logger.info("making final data set from raw data")
 
-    download_cards_parquet(input_filepath)
+    download_mtgjson_parquet(
+        input_filepath, url="https://mtgjson.com/api/v5/parquet/cards.parquet.zip"
+    )
+
+    download_mtgjson_parquet(
+        input_filepath,
+        url="https://mtgjson.com/api/v5/parquet/sets.parquet.zip",
+    )
 
 
 if __name__ == "__main__":

@@ -9,12 +9,12 @@ from langchain_community.vectorstores.utils import filter_complex_metadata
 from langchain_openai import OpenAIEmbeddings
 
 # Get a logger.
-log = structlog.get_logger()
+LOG = structlog.get_logger()
 
 
 def read_data(path: str) -> pl.DataFrame:
     data = pl.read_parquet(path)
-    log.debug("Read data", data=data.describe())
+    LOG.debug("Read data", data=data.describe())
     return data
 
 
@@ -63,10 +63,12 @@ def filter_main_sets(
         "LCC": "The Lost Caverns of Ixalan/Commander decks",
         "MKM": "Murders at Karlov Manor",
         "MKC": "Murders at Karlov Manor/Commander decks",
+        "PIP": "Fallout",
+        "OTJ": "Outlaws",
     }
     x_filtered = x.filter(pl.col("setCode").is_in(list(recent_main_sets.keys())))
 
-    log.debug("Filtered data", data=x_filtered.describe())
+    LOG.debug("Filtered data", data=x_filtered.describe())
     return x_filtered
 
 
@@ -94,7 +96,7 @@ def collapse_sets(
         .agg(pl.col("setCode").map_elements(list).alias("setCodes"))
         .sort("name")
     )
-    log.debug(
+    LOG.debug(
         "Collapsed data", data=x_collapsed.describe(), columns=x_collapsed.columns
     )
     return x_collapsed
@@ -108,7 +110,7 @@ def create_page_content(
         + pl.col("text").fill_null("")
         + pl.col("keywords").fill_null(""),
     )
-    log.debug(
+    LOG.debug(
         "Created page content",
         data=with_page_contents.describe(),
         columns=with_page_contents.columns,
@@ -125,7 +127,7 @@ def create_commander_selections(
         & (pl.col("supertypes") == "Legendary")
         & ~pl.col("name").str.starts_with("A-")  # untested
     )
-    log.debug(
+    LOG.debug(
         "Commander data",
         data=commander_selections.describe(),
         columns=commander_selections.columns,
@@ -148,34 +150,35 @@ if __name__ == "__main__":
         .collect()
     )
 
-    log.info(
+    LOG.info(
         "Processed data",
         data=processed_data.describe(),
         columns=processed_data.columns,
     )
 
+    processed_data.write_parquet("data/processed/processed_data.parquet")
+
     commanders = create_commander_selections(processed_data)
 
     commanders.write_parquet("data/processed/commanders.parquet")
 
-    log.info("Wrote commanders", data=commanders.describe())
+    LOG.info("Wrote commanders", data=commanders.describe())
 
     loader = PolarsDataFrameLoader(processed_data, page_content_column="page_content")
 
     documents = loader.load()
 
-    log.info("Loaded documents", first=documents[0], n=len(documents))
+    LOG.info("Loaded documents", first=documents[0], n=len(documents))
 
     filtered_documents = filter_complex_metadata(documents)
 
-    log.info(
+    LOG.info(
         "Filtered documents", first=filtered_documents[0], n=len(filtered_documents)
     )
 
-    embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
-
-    vectorstore = Chroma.from_documents(
-        filtered_documents, embeddings, persist_directory="src/application/chroma"
-    )
-
-    log.info("Created vectorstore", vectorstore=vectorstore)
+    # TODO: break into `make vectorstore` command
+    # embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
+    # vectorstore = Chroma.from_documents(
+    #     filtered_documents, embeddings, persist_directory="data/vectorstore"
+    # )
+    # LOG.info("Created vectorstore", vectorstore=vectorstore)
