@@ -135,7 +135,9 @@ def create_commander_selections(
 
 if __name__ == "__main__":
     # set log to info
-    logging.basicConfig(level=logging.INFO)
+    log_fmt = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    logging.basicConfig(level=logging.INFO, format=log_fmt)
+
     data = read_data("data/raw/cards.parquet")
 
     processed_data = (
@@ -154,7 +156,7 @@ if __name__ == "__main__":
 
     commanders = create_commander_selections(processed_data)
 
-    commanders.write_parquet("src/application/commanders.parquet")
+    commanders.write_parquet("data/processed/commanders.parquet")
 
     log.info("Wrote commanders", data=commanders.describe())
 

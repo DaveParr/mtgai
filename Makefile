@@ -29,6 +29,9 @@ requirements: test_environment
 data: requirements
 	$(PYTHON_INTERPRETER) src/data/make_dataset.py data/raw data/processed
 
+commander: requirements
+	$(PYTHON_INTERPRETER) src/data/make_commander.py data/raw data/processed
+
 ## Delete all compiled Python files
 clean:
 	find . -type f -name "*.py[co]" -delete
