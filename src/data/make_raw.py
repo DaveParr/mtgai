@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import logging
 from pathlib import Path
 from zipfile import ZipFile
 

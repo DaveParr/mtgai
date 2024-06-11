@@ -1,4 +1,3 @@
-import logging
 from datetime import date
 from pathlib import Path
 
@@ -24,7 +23,7 @@ def filter_main_sets(
         pl.col("code").alias("setCode"),
     ).filter(
         (pl.col("releaseDate") > cutoff_date)
-        & (pl.col("isOnlineOnly") != True)
+        & (pl.col("isOnlineOnly") != True)  # noqa: E712
         & pl.col("type").is_in(["core", "expansion", "commander", "draft_innovation"])
     )
 

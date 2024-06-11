@@ -27,7 +27,6 @@ COMMANDER_NAMES = COMMANDERS["name"].to_list()
 
 LOG = structlog.get_logger()
 
-
 LLM = ChatOpenAI(model="gpt-3.5-turbo-0125")
 
 
