@@ -288,7 +288,8 @@ def combine_in_colour_suggestions(suggestions: dict) -> pd.DataFrame:
     return df[df.in_commander_colours]
 
 
-st.session_state.commander_name = str(st.selectbox("Commander", COMMANDER_NAMES))
+with st.sidebar:
+    st.session_state.commander_name = str(st.selectbox("Commander", COMMANDER_NAMES))
 
 st.session_state.commander_data = get_commander_data(
     commander=str(st.session_state.commander_name)
@@ -308,30 +309,35 @@ def click_theme_button():
     st.session_state.themes_generated = True
 
 
-st.button("Generate deck theme suggestions", on_click=click_theme_button)
+with st.sidebar:
+    st.button("Generate deck theme suggestions", on_click=click_theme_button)
 
 if st.session_state.themes_generated:
     st.session_state.themes = generate_deck_theme_suggestion(
         st.session_state.commander_data
     ).dict()
 
-    st.session_state.selected_theme = st.radio(
-        "Choose a deck theme suggestion",
-        options=[
-            st.session_state.themes["theme_name_1"]
-            + " - "
-            + st.session_state.themes["theme_description_1"]
-            + " - "
-            + st.session_state.themes["theme_mechanics_1"],
-            st.session_state.themes["theme_name_2"]
-            + " - "
-            + st.session_state.themes["theme_description_2"]
-            + " - "
-            + st.session_state.themes["theme_mechanics_2"],
-        ],
-    )
+    with st.sidebar:
+        st.session_state.selected_theme = st.radio(
+            "Choose a deck theme suggestion",
+            options=[
+                st.session_state.themes["theme_name_1"]
+                + " - "
+                + st.session_state.themes["theme_description_1"]
+                + " - "
+                + st.session_state.themes["theme_mechanics_1"],
+                st.session_state.themes["theme_name_2"]
+                + " - "
+                + st.session_state.themes["theme_description_2"]
+                + " - "
+                + st.session_state.themes["theme_mechanics_2"],
+            ],
+        )
 
-    if st.button("Generate card suggestions") and st.session_state.selected_theme:
+    with st.sidebar:
+        st.button("Generate card suggestions", key="generate_card_suggestions")
+
+    if generate_card_suggestions and st.session_state.selected_theme:
         st.session_state.suggestions = {
             card_type: generate_card_suggestions(
                 prompt=prompt,
