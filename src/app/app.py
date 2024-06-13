@@ -49,6 +49,27 @@ def get_commander_data(commander: str) -> pd.DataFrame:
     )
 
 
+def convert_commander_data_to_structured_string_for_prompt(
+    commander_data: pd.DataFrame,
+) -> str:
+    """Takes a DataFrame of commander data and converts it to a structured string for use in a prompt.
+
+    Args:
+        commander_data (pd.DataFrame): DataFrame of commander data.
+
+    Returns:
+        str: Structured string of commander data. Where there are {} in the data, they are removed.
+    """
+
+    commander_data_dict = commander_data.to_dict(orient="records")[0]
+
+    structured_string = (
+        str(commander_data_dict).replace("{", "").replace("}", "").replace("'", "")
+    )
+
+    return structured_string
+
+
 class DeckThemes(BaseModel):
     theme_name_1: str = Field(description="Name of the first theme")
     theme_description_1: str = Field(description="Description of the first theme")
@@ -196,7 +217,12 @@ partial_prompts = {
 def generate_card_suggestions(
     prompt: BasePromptTemplate, commander_data: pd.DataFrame, commander: str, theme: str
 ) -> pd.DataFrame:
-    prompt = prompt.partial(commander=commander)
+    # convert commander data to str
+    commander_data_str = convert_commander_data_to_structured_string_for_prompt(
+        commander_data
+    )
+
+    prompt = prompt.partial(commander=commander_data_str)
 
     hyde_embeddings = HypotheticalDocumentEmbedder.from_llm(
         llm=LLM, base_embeddings=EMBEDDINGS, custom_prompt=prompt
@@ -267,6 +293,7 @@ st.session_state.commander_name = str(st.selectbox("Commander", COMMANDER_NAMES)
 st.session_state.commander_data = get_commander_data(
     commander=str(st.session_state.commander_name)
 )
+
 
 st.write(st.session_state.commander_data)
 
