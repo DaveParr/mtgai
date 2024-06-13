@@ -17,5 +17,6 @@ chroma == 0.2.0
 lark == 1.1.9
 langchain-chroma == 0.1.0
 streamlit == 1.33.0
+streamlit_extras == 0.4.3
 structlog == 24.1.0
 icecream == 2.1.3

@@ -8,6 +8,7 @@ from langchain.prompts import BasePromptTemplate, PromptTemplate
 from langchain_chroma import Chroma
 from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from streamlit_card import card
 
 set_debug(True)
 
@@ -291,12 +292,29 @@ def combine_in_colour_suggestions(suggestions: dict) -> pd.DataFrame:
 with st.sidebar:
     st.session_state.commander_name = str(st.selectbox("Commander", COMMANDER_NAMES))
 
+
 st.session_state.commander_data = get_commander_data(
     commander=str(st.session_state.commander_name)
 )
 
-
-st.write(st.session_state.commander_data)
+card(
+    title=st.session_state.commander_data["name"].values[0],
+    text=[
+        st.session_state.commander_data["manaCost"].values[0],
+        st.session_state.commander_data["types"].values[0]
+        + " - "
+        + st.session_state.commander_data["subtypes"].values[0],
+        st.session_state.commander_data["text"].values[0],
+        st.session_state.commander_data["power"].values[0]
+        + "/"
+        + st.session_state.commander_data["toughness"].values[0],
+    ],styles={
+        "card": {
+            "width": "100%",
+            "height": "300px",
+        }
+    },
+)
 
 st.session_state.selected_theme = None
 
@@ -352,9 +370,26 @@ if st.session_state.themes_generated:
             st.session_state.suggestions
         )
 
+        ## Display the suggestions using the card component
+
+        for suggestion in st.session_state.all_in_colour_suggestions.iterrows():
+            card(
+                title=suggestion[1]["name"],
+                text=[
+                    suggestion[1]["text"],
+                ],
+                styles={
+        "card": {
+            "width": "100%",
+            "height": "300px",
+        }
+    },
+            )
+
         # TODO: Instead of displaying the vectors based on similarity, have them filtered/ reranked by an llm
 
-        st.write(
-            "## Suggestions",
+        st.write("## Card Suggestions")
+        st.dataframe(
             st.session_state.all_in_colour_suggestions,
+            hide_index=True,
         )
