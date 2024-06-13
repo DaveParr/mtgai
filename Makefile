@@ -32,7 +32,7 @@ raw: requirements
 
 ## Make processed dataset from raw dataset
 processed: requirements
-	$(PYTHON_INTERPRETER) src/data/make_processed.py data/raw data/processed --cutoff_date=2023-1-1
+	$(PYTHON_INTERPRETER) src/data/make_processed.py data/raw data/processed --cutoff_date=1993-1-1
 
 ## Make vectorstore from processed dataset
 vectorstore: requirements

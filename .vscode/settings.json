@@ -1,0 +1,12 @@
+{
+    "window.autoDetectColorScheme": true,
+    "python.analysis.typeCheckingMode": "basic",
+    "python.analysis.inlayHints.callArgumentNames": "partial",
+    "python.analysis.inlayHints.functionReturnTypes": true,
+    "python.analysis.inlayHints.pytestParameters": true,
+    "python.analysis.inlayHints.variableTypes": true,
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "ruff.lint.select": [
+        "ALL"
+    ]
+}
