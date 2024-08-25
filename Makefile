@@ -42,7 +42,7 @@ vectorstore: requirements
 data: raw processed vectorstore
 
 ## Start the streamlit application
-app: requirements
+app:
 	@streamlit run src/app/app.py
 
 ## Delete all compiled Python files
