@@ -8,6 +8,7 @@ from langchain.prompts import BasePromptTemplate, PromptTemplate
 from langchain_chroma import Chroma
 from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from streamlit_card import card
 
 set_debug(True)
 
@@ -47,6 +48,27 @@ def get_commander_data(commander: str) -> pd.DataFrame:
         )
         .to_pandas()
     )
+
+
+def convert_commander_data_to_structured_string_for_prompt(
+    commander_data: pd.DataFrame,
+) -> str:
+    """Takes a DataFrame of commander data and converts it to a structured string for use in a prompt.
+
+    Args:
+        commander_data (pd.DataFrame): DataFrame of commander data.
+
+    Returns:
+        str: Structured string of commander data. Where there are {} in the data, they are removed.
+    """
+
+    commander_data_dict = commander_data.to_dict(orient="records")[0]
+
+    structured_string = (
+        str(commander_data_dict).replace("{", "").replace("}", "").replace("'", "")
+    )
+
+    return structured_string
 
 
 class DeckThemes(BaseModel):
@@ -196,7 +218,12 @@ partial_prompts = {
 def generate_card_suggestions(
     prompt: BasePromptTemplate, commander_data: pd.DataFrame, commander: str, theme: str
 ) -> pd.DataFrame:
-    prompt = prompt.partial(commander=commander)
+    # convert commander data to str
+    commander_data_str = convert_commander_data_to_structured_string_for_prompt(
+        commander_data
+    )
+
+    prompt = prompt.partial(commander=commander_data_str)
 
     hyde_embeddings = HypotheticalDocumentEmbedder.from_llm(
         llm=LLM, base_embeddings=EMBEDDINGS, custom_prompt=prompt
@@ -262,13 +289,34 @@ def combine_in_colour_suggestions(suggestions: dict) -> pd.DataFrame:
     return df[df.in_commander_colours]
 
 
-st.session_state.commander_name = str(st.selectbox("Commander", COMMANDER_NAMES))
+with st.sidebar:
+    st.session_state.commander_name = str(st.selectbox("Commander", COMMANDER_NAMES))
+
 
 st.session_state.commander_data = get_commander_data(
     commander=str(st.session_state.commander_name)
 )
 
-st.write(st.session_state.commander_data)
+
+card(
+    title=st.session_state.commander_data["name"].values[0],
+    text=[
+        st.session_state.commander_data["manaCost"].values[0],
+        st.session_state.commander_data["types"].values[0]
+        + " - "
+        + st.session_state.commander_data["subtypes"].values[0],
+        st.session_state.commander_data["text"].values[0],
+        st.session_state.commander_data["power"].values[0]
+        + "/"
+        + st.session_state.commander_data["toughness"].values[0],
+    ],
+    styles={
+        "card": {
+            "width": "100%",
+            "height": "300px",
+        }
+    },
+)
 
 st.session_state.selected_theme = None
 
@@ -281,30 +329,35 @@ def click_theme_button():
     st.session_state.themes_generated = True
 
 
-st.button("Generate deck theme suggestions", on_click=click_theme_button)
+with st.sidebar:
+    st.button("Generate deck theme suggestions", on_click=click_theme_button)
 
 if st.session_state.themes_generated:
     st.session_state.themes = generate_deck_theme_suggestion(
         st.session_state.commander_data
     ).dict()
 
-    st.session_state.selected_theme = st.radio(
-        "Choose a deck theme suggestion",
-        options=[
-            st.session_state.themes["theme_name_1"]
-            + " - "
-            + st.session_state.themes["theme_description_1"]
-            + " - "
-            + st.session_state.themes["theme_mechanics_1"],
-            st.session_state.themes["theme_name_2"]
-            + " - "
-            + st.session_state.themes["theme_description_2"]
-            + " - "
-            + st.session_state.themes["theme_mechanics_2"],
-        ],
-    )
+    with st.sidebar:
+        st.session_state.selected_theme = st.radio(
+            "Choose a deck theme suggestion",
+            options=[
+                st.session_state.themes["theme_name_1"]
+                + " - "
+                + st.session_state.themes["theme_description_1"]
+                + " - "
+                + st.session_state.themes["theme_mechanics_1"],
+                st.session_state.themes["theme_name_2"]
+                + " - "
+                + st.session_state.themes["theme_description_2"]
+                + " - "
+                + st.session_state.themes["theme_mechanics_2"],
+            ],
+        )
 
-    if st.button("Generate card suggestions") and st.session_state.selected_theme:
+    with st.sidebar:
+        st.button("Generate card suggestions", key="generate_card_suggestions")
+
+    if generate_card_suggestions and st.session_state.selected_theme:
         st.session_state.suggestions = {
             card_type: generate_card_suggestions(
                 prompt=prompt,
@@ -321,7 +374,9 @@ if st.session_state.themes_generated:
 
         # TODO: Instead of displaying the vectors based on similarity, have them filtered/ reranked by an llm
 
-        st.write(
-            "## Suggestions",
+        st.write("## Card Suggestions")
+        st.dataframe(
             st.session_state.all_in_colour_suggestions,
+            hide_index=True,
+            height=1000
         )
