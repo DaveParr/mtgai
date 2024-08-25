@@ -297,6 +297,7 @@ st.session_state.commander_data = get_commander_data(
     commander=str(st.session_state.commander_name)
 )
 
+
 card(
     title=st.session_state.commander_data["name"].values[0],
     text=[
@@ -308,7 +309,8 @@ card(
         st.session_state.commander_data["power"].values[0]
         + "/"
         + st.session_state.commander_data["toughness"].values[0],
-    ],styles={
+    ],
+    styles={
         "card": {
             "width": "100%",
             "height": "300px",
@@ -370,26 +372,11 @@ if st.session_state.themes_generated:
             st.session_state.suggestions
         )
 
-        ## Display the suggestions using the card component
-
-        for suggestion in st.session_state.all_in_colour_suggestions.iterrows():
-            card(
-                title=suggestion[1]["name"],
-                text=[
-                    suggestion[1]["text"],
-                ],
-                styles={
-        "card": {
-            "width": "100%",
-            "height": "300px",
-        }
-    },
-            )
-
         # TODO: Instead of displaying the vectors based on similarity, have them filtered/ reranked by an llm
 
         st.write("## Card Suggestions")
         st.dataframe(
             st.session_state.all_in_colour_suggestions,
             hide_index=True,
+            height=1000
         )
