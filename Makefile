@@ -41,10 +41,6 @@ vectorstore: requirements
 ## Make all datasets
 data: raw processed vectorstore
 
-## Start the streamlit application
-app: requirements
-	@streamlit run src/app/app.py
-
 ## Delete all compiled Python files
 clean:
 	find . -type f -name "*.py[co]" -delete
