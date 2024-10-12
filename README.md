@@ -1,7 +1,9 @@
 mtgai
 ==============================
 
-Experiments with MTG and AI
+MTGAI is a collection of experiments with Magic: The Gathering data and AI tools.
+
+[streamlit-app-2024-10-12-15-10-18.webm](https://github.com/user-attachments/assets/a3f963fc-cab0-460e-9faf-a52c38de30c2)
 
 Project Organization
 ------------
