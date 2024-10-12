@@ -8,8 +8,11 @@ from langchain.prompts import BasePromptTemplate, PromptTemplate
 from langchain_chroma import Chroma
 from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from dotenv import find_dotenv, load_dotenv
 
 set_debug(True)
+
+load_dotenv(find_dotenv())
 
 try:
     from icecream import ic
