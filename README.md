@@ -2,10 +2,7 @@ mtgai
 ==============================
 
 
-<video width="600" controls>
-  <source src="https://raw.githubusercontent.com/DaveParr/mtgai/raw/refs/heads/demo-video/data/demo/streamlit-app-2024-10-12-15-10-18.webm" type="video/webm">
-  Your browser does not support the video tag.
-</video>
+![](data/demo/streamlit-app-2024-10-12-15-10-18.webm)
 
 Experiments with MTG and AI
 
