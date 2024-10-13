@@ -69,9 +69,14 @@ It looks like this:
 
 ```bash
 OPENAI_API_KEY=sk-...
-OPENAI_ORG_ID='org-...'
 LANGCHAIN_PROJECT="mtgai"
 LANGCHAIN_API_KEY='ls__...'
 LANGCHAIN_TRACING_V2=True
 ```
+
+`OPENAI_API_KEY` is the key for the OpenAI API. You can get it from the OpenAI website. It's likely that you should use a `sk-proj` "project" key. If you want to use a different key (such as a key linked to an "organisation" starting with `sk-org`), this should work, though you may also need to have set the `OPENAI_ORG_ID` environment variable.
+
+The `LANGCHAIN_*` variables are for the Langchain Langsmith observability platform, and are optional. You can get them from the Langchain website. The `LANGCHAIN_PROJECT` is the project name, and the `LANGCHAIN_API_KEY` is the API key. The `LANGCHAIN_TRACING_V2` is a boolean that determines whether to use the new tracing system.
+
+
 <p><small>Project based on the <a target="_blank" href="https://drivendata.github.io/cookiecutter-data-science/">cookiecutter data science project template</a>. #cookiecutterdatascience</small></p>
